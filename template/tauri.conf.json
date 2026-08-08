@@ -11,8 +11,8 @@
       {
         "title": "{{TITLE}}",
         "url": "about:blank",
-        "width": 1280,
-        "height": 720,
+        "width": {{WIDTH}},
+        "height": {{HEIGHT}},
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,

@@ -121,6 +121,12 @@ def generate_app(app):
 
     # 生成源码文件
     subs = {
+        # 双大括号占位符必须在前（否则单大括号会先匹配破坏它们）
+        "{{TITLE}}": title,
+        "{{IDENTIFIER}}": app["identifier"],
+        "{{WIDTH}}": str(app.get("width", 1280)),
+        "{{HEIGHT}}": str(app.get("height", 720)),
+        # 单大括号占位符
         "{TITLE}": title,
         "{NAME}": name,
         "{NAME_UPPER}": name.upper(),
