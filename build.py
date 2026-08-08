@@ -136,30 +136,30 @@ def generate_app(app):
         return content
 
     # lib.rs
-    with open(os.path.join(TEMPLATE, "lib.rs")) as f:
+    with open(os.path.join(TEMPLATE, "lib.rs"), encoding="utf-8") as f:
         content = sub(f.read())
-    with open(os.path.join(src_tauri, "src", "lib.rs"), "w") as f:
+    with open(os.path.join(src_tauri, "src", "lib.rs"), "w", encoding="utf-8") as f:
         f.write(content)
 
     # main.rs
-    with open(os.path.join(TEMPLATE, "main.rs")) as f:
+    with open(os.path.join(TEMPLATE, "main.rs"), encoding="utf-8") as f:
         content = sub(f.read())
-    with open(os.path.join(src_tauri, "src", "main.rs"), "w") as f:
+    with open(os.path.join(src_tauri, "src", "main.rs"), "w", encoding="utf-8") as f:
         f.write(content)
 
     # Cargo.toml
-    with open(os.path.join(TEMPLATE, "Cargo.toml")) as f:
+    with open(os.path.join(TEMPLATE, "Cargo.toml"), encoding="utf-8") as f:
         content = sub(f.read())
-    with open(os.path.join(src_tauri, "Cargo.toml"), "w") as f:
+    with open(os.path.join(src_tauri, "Cargo.toml"), "w", encoding="utf-8") as f:
         f.write(content)
 
     # build.rs
     shutil.copy(os.path.join(TEMPLATE, "build.rs"), os.path.join(src_tauri, "build.rs"))
 
     # tauri.conf.json
-    with open(os.path.join(TEMPLATE, "tauri.conf.json")) as f:
+    with open(os.path.join(TEMPLATE, "tauri.conf.json"), encoding="utf-8") as f:
         content = sub(f.read())
-    with open(os.path.join(src_tauri, "tauri.conf.json"), "w") as f:
+    with open(os.path.join(src_tauri, "tauri.conf.json"), "w", encoding="utf-8") as f:
         f.write(content)
 
     # capabilities
@@ -167,17 +167,17 @@ def generate_app(app):
                 os.path.join(src_tauri, "capabilities", "default.json"))
 
     # dist/index.html
-    with open(os.path.join(TEMPLATE, "index.html")) as f:
+    with open(os.path.join(TEMPLATE, "index.html"), encoding="utf-8") as f:
         content = sub(f.read())
-    with open(os.path.join(out_dir, "dist", "index.html"), "w") as f:
+    with open(os.path.join(out_dir, "dist", "index.html"), "w", encoding="utf-8") as f:
         f.write(content)
 
     # settings.ini
-    with open(os.path.join(out_dir, "settings.ini"), "w") as f:
+    with open(os.path.join(out_dir, "settings.ini"), "w", encoding="utf-8") as f:
         f.write(gen_settings_ini(app))
 
     # README.md
-    with open(os.path.join(out_dir, "README.md"), "w") as f:
+    with open(os.path.join(out_dir, "README.md"), "w", encoding="utf-8") as f:
         f.write(gen_readme(app))
 
     # .gitignore
@@ -188,7 +188,7 @@ def generate_app(app):
 
 
 def main():
-    with open(APPS_JSON) as f:
+    with open(APPS_JSON, encoding="utf-8") as f:
         apps = json.load(f)
 
     print(f"共 {len(apps)} 个应用:")

@@ -47,7 +47,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           import json, subprocess, os, glob
-          apps = json.load(open('apps.json'))
+          apps = json.load(open('apps.json', encoding='utf-8'))
           for app in apps:
               name = app['name']
               print(f"=== 构建 {name} ===")
@@ -66,7 +66,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           import json, os, shutil, glob
-          apps = json.load(open('apps.json'))
+          apps = json.load(open('apps.json', encoding='utf-8'))
           os.makedirs('release', exist_ok=True)
           for app in apps:
               name = app['name']
@@ -95,7 +95,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           import json, os, glob, subprocess, urllib.parse
-          apps = json.load(open('apps.json'))
+          apps = json.load(open('apps.json', encoding='utf-8'))
           for app in apps:
               name = app['name']
               title = app['title']
