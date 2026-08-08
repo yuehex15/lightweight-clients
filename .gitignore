@@ -1,0 +1,14 @@
+# Rust
+apps/*/src-tauri/target/
+apps/*/src-tauri/gen/
+
+# Node.js
+node_modules/
+
+# Generated
+apps/*/dist/
+apps/*/settings.ini
+
+# OS
+.DS_Store
+Thumbs.db

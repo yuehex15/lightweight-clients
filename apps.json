@@ -1,0 +1,35 @@
+[
+  {
+    "name": "moontv",
+    "title": "MoonTV",
+    "name_zh": "MoonTV",
+    "url": "https://tv.zsam.de5.net/",
+    "width": 1280,
+    "height": 720,
+    "identifier": "com.moontv.client",
+    "icon_color": [0, 120, 212],
+    "description": "MoonTV 影视客户端"
+  },
+  {
+    "name": "nodeseek",
+    "title": "Nodeseek",
+    "name_zh": "Nodeseek",
+    "url": "https://www.nodeseek.com/",
+    "width": 1280,
+    "height": 720,
+    "identifier": "com.nodeseek.client",
+    "icon_color": [0, 180, 100],
+    "description": "Nodeseek 论坛客户端"
+  },
+  {
+    "name": "linuxdo",
+    "title": "Linux.Do",
+    "name_zh": "Linux.Do",
+    "url": "https://linux.do/",
+    "width": 1280,
+    "height": 720,
+    "identifier": "com.linuxdo.client",
+    "icon_color": [200, 70, 0],
+    "description": "Linux.Do 论坛客户端"
+  }
+]

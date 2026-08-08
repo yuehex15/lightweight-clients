@@ -1,0 +1,119 @@
+name: 构建所有客户端
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  build-all:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+        with: { targets: x86_64-pc-windows-msvc }
+
+      - name: 缓存 Tauri CLI
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-tauri*
+            ~/.cargo/.crates.toml
+            ~/.cargo/.crates2.json
+          key: tauri-cli-${{ runner.os }}-2
+
+      - name: 安装 Tauri CLI
+        shell: bash
+        run: |
+          if ! command -v cargo-tauri &> /dev/null; then
+            cargo install tauri-cli --version "^2"
+          else
+            echo "Tauri CLI 已缓存"
+          fi
+
+      - name: 生成所有客户端源码
+        run: python3 build.py
+
+      - name: 构建所有客户端
+        shell: bash
+        run: |
+          for app in moontv nodeseek linuxdo; do
+            echo "=== 构建 $app ==="
+            cd apps/$app
+            npx @tauri-apps/cli icon src-tauri/icons/icon.png 2>/dev/null
+            cargo tauri build
+            cd ../../
+          done
+
+      - name: 打包 zip
+        shell: bash
+        run: |
+          mkdir -p release
+          for app in moontv nodeseek linuxdo; do
+            case $app in
+              moontv) title="MoonTV" ;;
+              nodeseek) title="Nodeseek" ;;
+              linuxdo) title="LinuxDo" ;;
+            esac
+            mkdir -p "release/$title"
+            cp apps/$app/src-tauri/target/release/*.exe "release/$title/"
+            cp apps/$app/settings.ini "release/$title/"
+            # 复制 MSI
+            mkdir -p "release/msi"
+            cp apps/$app/src-tauri/target/release/bundle/msi/*.msi "release/msi/" 2>/dev/null || true
+            powershell -Command "Compress-Archive -Path 'release/$title/*' -DestinationPath 'release/$title-Windows-x64.zip' -Force"
+            echo "打包 $title 完成"
+          done
+
+      - name: 发布 MoonTV（覆盖旧版本）
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: moontv
+          name: MoonTV
+          body: MoonTV 轻量 Windows 客户端 — 由 GitHub Actions 自动构建
+          artifacts: |
+            release/MoonTV-Windows-x64.zip
+            release/msi/MoonTV*.msi
+          allowUpdates: true
+          replacesArtifacts: true
+          updateOnlyUnreleased: false
+          skipIfReleaseExists: false
+
+      - name: 发布 Nodeseek（覆盖旧版本）
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: nodeseek
+          name: Nodeseek
+          body: Nodeseek 轻量 Windows 客户端 — 由 GitHub Actions 自动构建
+          artifacts: |
+            release/Nodeseek-Windows-x64.zip
+            release/msi/Nodeseek*.msi
+          allowUpdates: true
+          replacesArtifacts: true
+          updateOnlyUnreleased: false
+          skipIfReleaseExists: false
+
+      - name: 发布 LinuxDo（覆盖旧版本）
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: linuxdo
+          name: Linux.Do
+          body: Linux.Do 轻量 Windows 客户端 — 由 GitHub Actions 自动构建
+          artifacts: |
+            release/LinuxDo-Windows-x64.zip
+            release/msi/LinuxDo*.msi
+          allowUpdates: true
+          replacesArtifacts: true
+          updateOnlyUnreleased: false
+          skipIfReleaseExists: false
