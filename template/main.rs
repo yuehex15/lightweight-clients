@@ -6,7 +6,7 @@ fn main() {
     {
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(parent) = exe_path.parent() {
-                let data_dir = parent.join("{NAME_UPPER}_Data");
+                let data_dir = parent.join("{NAME}_data");
                 std::fs::create_dir_all(&data_dir).ok();
                 std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &data_dir);
             }
