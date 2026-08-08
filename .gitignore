@@ -5,9 +5,8 @@ apps/*/src-tauri/gen/
 # Node.js
 node_modules/
 
-# Generated
-apps/*/dist/
-apps/*/settings.ini
+# Generated apps (由 build.py 生成，不提交)
+apps/
 
 # OS
 .DS_Store
