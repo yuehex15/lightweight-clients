@@ -43,29 +43,6 @@ jobs:
       - name: 生成所有客户端源码
         run: python3 build.py
 
-      - name: 下载 WebView2 固定运行时
-        shell: bash
-        run: |
-          python3 - <<'EOF'
-          import json, os, shutil, urllib.request, zipfile
-          url = "https://msedgewebview2distribution.blob.core.windows.net/archive/MicrosoftEdgeWebView2Runtime_1.0.2739.15_X64.zip"
-          pkg_path = "/tmp/wv2_x64.zip"
-          try:
-              print("下载 WebView2 运行时 (~130MB)...")
-              urllib.request.urlretrieve(url, pkg_path)
-              apps = json.load(open('apps.json', encoding='utf-8'))
-              for app in apps:
-                  name = app['name']
-                  dst = f"apps/{name}/webview2-runtime"
-                  os.makedirs(dst, exist_ok=True)
-                  with zipfile.ZipFile(pkg_path, 'r') as z:
-                      z.extractall(dst)
-                  print(f"  {name}: 运行时已就绪")
-          except Exception as e:
-              print(f"下载失败: {e}")
-              exit(1)
-          EOF
-
       - name: 构建所有客户端
         shell: bash
         run: |

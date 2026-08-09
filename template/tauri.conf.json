@@ -43,7 +43,8 @@
         "installMode": "currentUser"
       },
       "webviewInstallMode": {
-        "type": "skip"
+        "type": "downloadBootstrapper",
+        "silent": true
       }
     }
   }
