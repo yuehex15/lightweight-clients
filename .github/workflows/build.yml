@@ -95,7 +95,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 - <<'EOF'
-          import json, os, glob, subprocess, urllib.parse
+          import json, os, glob, urllib.request, urllib.parse
+
+          GH_TOKEN = os.environ['GH_TOKEN']
+          REPO = "yuehex15/lightweight-clients"
+          API = f"https://api.github.com/repos/{REPO}"
+          UPLOAD = f"https://uploads.github.com/repos/{REPO}"
+
+          def req(url, method="GET", data=None, headers=None, raw=False):
+              h = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+              if headers: h.update(headers)
+              body = None
+              if data is not None:
+                  if raw:
+                      body = data
+                  else:
+                      body = json.dumps(data).encode('utf-8')
+                      h["Content-Type"] = "application/json"
+              r = urllib.request.Request(url, data=body, method=method, headers=h)
+              try:
+                  with urllib.request.urlopen(r) as resp:
+                      return resp.status, resp.read()
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read()
+
           apps = json.load(open('apps.json', encoding='utf-8'))
           for app in apps:
               name = app['name']
@@ -103,62 +126,39 @@ jobs:
               zip_path = glob.glob(f"release/{title}-Windows-x64.zip")[0]
               msi_paths = glob.glob(f"release/msi/{title}*.msi")
 
-              # 创建或更新 release
-              create = subprocess.run(
-                  ["curl", "-s", "-X", "POST",
-                   "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                   "-H", "Accept: application/vnd.github.v3+json",
-                   "https://api.github.com/repos/yuehex15/lightweight-clients/releases",
-                   "-d", json.dumps({
-                       "tag_name": name,
-                       "name": title,
-                       "body": f"{title} 轻量 Windows 客户端 — 由 GitHub Actions 自动构建",
-                       "draft": False,
-                       "prerelease": False
-                   })],
-                  capture_output=True, text=True)
-              import json as j
-              try:
-                  rel = j.loads(create.stdout)
-                  release_id = rel.get('id')
-              except:
-                  release_id = None
-
-              # 如果已存在（tag 冲突），获取现有 release id
-              if not release_id:
-                  get = subprocess.run(
-                      ["curl", "-s", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                       f"https://api.github.com/repos/yuehex15/lightweight-clients/releases/tags/{name}"],
-                      capture_output=True, text=True)
-                  try:
-                      rel = j.loads(get.stdout)
-                      release_id = rel.get('id')
-                  except:
-                      release_id = None
+              # 创建 release（若 tag 已存在会 422，则获取现有）
+              status, body = req(f"{API}/releases", "POST", {
+                  "tag_name": name, "name": title,
+                  "body": f"{title} 轻量 Windows 客户端 — 由 GitHub Actions 自动构建",
+                  "draft": False, "prerelease": False
+              })
+              release_id = None
+              if status == 201:
+                  release_id = json.loads(body)['id']
+              else:
+                  status, body = req(f"{API}/releases/tags/{name}")
+                  if status == 200:
+                      release_id = json.loads(body)['id']
 
               if not release_id:
-                  print(f"❌ {name}: 无法创建或获取 release")
+                  print(f"❌ {name}: 无法创建/获取 release (HTTP {status})")
                   continue
 
               # 上传 zip
-              up = subprocess.run(
-                  ["curl", "-s", "-X", "POST",
-                   "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                   "-H", "Content-Type: application/zip",
-                   f"https://uploads.github.com/repos/yuehex15/lightweight-clients/releases/{release_id}/assets?name={urllib.parse.quote(zip_path.split('/')[-1])}",
-                   "--data-binary", f"@{zip_path}"],
-                  capture_output=True, text=True)
-              print(f"  {title}: 上传 zip {'✅' if 'browser_download_url' in up.stdout else '❌'}")
+              with open(zip_path, 'rb') as f:
+                  data = f.read()
+              fname = urllib.parse.quote(zip_path.split('/')[-1])
+              status, body = req(f"{UPLOAD}/releases/{release_id}/assets?name={fname}",
+                                 "POST", data, {"Content-Type": "application/zip"}, raw=True)
+              print(f"  {title}: zip {'✅' if status in (200,201) else '❌ HTTP '+str(status)}")
 
               # 上传 MSI
               for msi in msi_paths:
-                  up = subprocess.run(
-                      ["curl", "-s", "-X", "POST",
-                       "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                       "-H", "Content-Type: application/octet-stream",
-                       f"https://uploads.github.com/repos/yuehex15/lightweight-clients/releases/{release_id}/assets?name={urllib.parse.quote(msi.split('/')[-1])}",
-                       "--data-binary", f"@{msi}"],
-                      capture_output=True, text=True)
-                  print(f"  {title}: 上传 MSI {'✅' if 'browser_download_url' in up.stdout else '❌'}")
+                  with open(msi, 'rb') as f:
+                      data = f.read()
+                  fname = urllib.parse.quote(msi.split('/')[-1])
+                  status, body = req(f"{UPLOAD}/releases/{release_id}/assets?name={fname}",
+                                     "POST", data, {"Content-Type": "application/octet-stream"}, raw=True)
+                  print(f"  {title}: MSI {'✅' if status in (200,201) else '❌ HTTP '+str(status)}")
           print("✅ 发布完成")
           EOF
