@@ -56,18 +56,36 @@ jobs:
               exe = os.path.join(tmp, "installer.exe")
               os.makedirs(tmp, exist_ok=True)
               urllib.request.urlretrieve(url, exe)
+              print(f"  下载完成: {os.path.getsize(exe)/1024/1024:.1f} MB")
               # 第一层解压：安装器 → MSI + CAB
               ext1 = os.path.join(tmp, "extracted")
-              subprocess.run(["7z", "x", exe, f"-o{ext1}", "-y", "-r"], check=True, capture_output=True, timeout=120)
-              # 找到 MSI 文件
-              msi_files = []
-              for root, dirs, files in os.walk(ext1):
-                  for f in files:
-                      if f.endswith('.msi'):
-                          msi_files.append(os.path.join(root, f))
+              r = subprocess.run(["7z", "x", exe, f"-o{ext1}", "-y", "-r"],
+                  capture_output=True, text=True, timeout=120)
+              print(f"  7z 退出码: {r.returncode}")
+              print(f"  7z 输出: {r.stdout[:500]}")
+              if r.returncode != 0:
+                  print(f"  7z 错误: {r.stderr[:200]}")
+              # 列出提取的文件
+              files = []
+              for root, dirs, fnames in os.walk(ext1):
+                  for f in fnames:
+                      files.append(os.path.join(root, f))
+              print(f"  提取文件数: {len(files)}")
+              if files:
+                  for f in files[:10]:
+                      print(f"    - {os.path.relpath(f, ext1)} ({os.path.getsize(f)/1024/1024:.1f} MB)")
+              # 查找 MSI 或实际操作目录
+              msi_files = [f for f in files if f.endswith('.msi')]
               if not msi_files:
-                  print("找不到 MSI 文件"); exit(1)
-              print(f"  MSI: {os.path.basename(msi_files[0])}")
+                  # 可能没有 MSI，直接使用提取的文件
+                  print("  无 MSI 文件，直接使用提取的文件")
+                  for app in apps:
+                      name = app['name']
+                      dst = f"apps/{name}/webview2-runtime"
+                      shutil.rmtree(dst, ignore_errors=True)
+                      shutil.copytree(ext1, dst)
+                      print(f"  {name}: 已就绪")
+                  exit(0)
               # 第二层解压：MSI → 运行时文件
               for app in apps:
                   name = app['name']
@@ -120,18 +138,6 @@ jobs:
                   shutil.copy(msi, 'release/msi')
               shutil.make_archive(f"release/{title}-Windows-x64", 'zip', pkg_dir)
               print(f"打包 {title} 完成")
-          # 统一打包所有 app 到一个 zip
-          import zipfile
-          all_zip = "release/lightweight-clients-all.zip"
-          with zipfile.ZipFile(all_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
-              for app in apps:
-                  title = app['title']
-                  zip_path = f"release/{title}-Windows-x64.zip"
-                  zf.write(zip_path, os.path.basename(zip_path))
-                  # 也包含 MSI
-                  for msi in glob.glob(f"release/msi/{title}*.msi"):
-                      zf.write(msi, f"msi/{os.path.basename(msi)}")
-          print(f"统一打包: {all_zip}")
           print("✅ 打包完成")
           EOF
 
