@@ -43,8 +43,7 @@
         "installMode": "currentUser"
       },
       "webviewInstallMode": {
-        "type": "offlineInstaller",
-        "silent": true
+        "type": "skip"
       }
     }
   }

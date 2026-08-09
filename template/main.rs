@@ -9,6 +9,11 @@ fn main() {
                 let data_dir = parent.join("{NAME}_data");
                 std::fs::create_dir_all(&data_dir).ok();
                 std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &data_dir);
+                // 设置 WebView2 固定运行时路径（便携，不装系统）
+                let runtime_dir = parent.join("webview2-runtime");
+                if runtime_dir.exists() {
+                    std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", &runtime_dir);
+                }
             }
         }
     }
