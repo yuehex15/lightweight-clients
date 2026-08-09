@@ -120,6 +120,18 @@ jobs:
                   shutil.copy(msi, 'release/msi')
               shutil.make_archive(f"release/{title}-Windows-x64", 'zip', pkg_dir)
               print(f"打包 {title} 完成")
+          # 统一打包所有 app 到一个 zip
+          import zipfile
+          all_zip = "release/lightweight-clients-all.zip"
+          with zipfile.ZipFile(all_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
+              for app in apps:
+                  title = app['title']
+                  zip_path = f"release/{title}-Windows-x64.zip"
+                  zf.write(zip_path, os.path.basename(zip_path))
+                  # 也包含 MSI
+                  for msi in glob.glob(f"release/msi/{title}*.msi"):
+                      zf.write(msi, f"msi/{os.path.basename(msi)}")
+          print(f"统一打包: {all_zip}")
           print("✅ 打包完成")
           EOF
 
@@ -132,32 +144,26 @@ jobs:
           import json, os, glob, subprocess, urllib.parse
           API = "https://api.github.com/repos/yuehex15/lightweight-clients"
           UPLOAD = "https://uploads.github.com/repos/yuehex15/lightweight-clients"
-          apps = json.load(open('apps.json', encoding='utf-8'))
-          for app in apps:
-              name = app['name']; title = app['title']
-              zip_path = glob.glob(f"release/{title}-Windows-x64.zip")[0]
-              msi_paths = glob.glob(f"release/msi/{title}*.msi")
-              r = subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                  "-H", "Content-Type: application/json", f"{API}/releases",
-                  "-d", json.dumps({"tag_name": name, "name": title, "draft": False, "prerelease": False})],
-                  capture_output=True)
+          # 创建或获取 release (统一 tag: latest)
+          r = subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+              "-H", "Content-Type: application/json", f"{API}/releases",
+              "-d", json.dumps({"tag_name": "latest", "name": "lightweight-clients", "draft": False, "prerelease": False})],
+              capture_output=True)
+          try:
+              release_id = json.loads(r.stdout)['id']
+          except:
+              r = subprocess.run(["curl", "-s", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+                  f"{API}/releases/tags/latest"], capture_output=True)
               try:
                   release_id = json.loads(r.stdout)['id']
               except:
-                  r = subprocess.run(["curl", "-s", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                      f"{API}/releases/tags/{name}"], capture_output=True)
-                  try:
-                      release_id = json.loads(r.stdout)['id']
-                  except:
-                      print(f"❌ {name}: 无法获取 release"); continue
+                  print("❌ 无法获取 release"); exit(1)
+          # 上传所有文件
+          for f in glob.glob("release/*.zip") + glob.glob("release/msi/*.msi"):
+              fname = os.path.basename(f)
               subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                  "-H", "Content-Type: application/zip", "--data-binary", f"@{zip_path}",
-                  f"{UPLOAD}/releases/{release_id}/assets?name={urllib.parse.quote(os.path.basename(zip_path))}"])
-              print(f"  {title}: zip ✅")
-              for msi in msi_paths:
-                  subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                      "-H", "Content-Type: application/octet-stream", "--data-binary", f"@{msi}",
-                      f"{UPLOAD}/releases/{release_id}/assets?name={urllib.parse.quote(os.path.basename(msi))}"])
-                  print(f"  {title}: MSI ✅")
+                  "-H", "Content-Type: application/octet-stream", "--data-binary", f"@{f}",
+                  f"{UPLOAD}/releases/{release_id}/assets?name={urllib.parse.quote(fname)}"])
+              print(f"  {fname}: ✅")
           print("✅ 发布完成")
           EOF
