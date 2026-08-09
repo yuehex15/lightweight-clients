@@ -43,23 +43,47 @@ jobs:
       - name: 生成所有客户端源码
         run: python3 build.py
 
-      - name: 下载 WebView2 运行时（便携）
+      - name: 下载 WebView2 运行时并极致精简
         shell: bash
         run: |
-          python3 - <<'EOF'
-          import json, os, shutil, subprocess
+          python3 - <<'PYEOF'
+          import json, os, shutil, subprocess, re
+
           apps = json.load(open('apps.json', encoding='utf-8'))
+
+          # 白名单：只保留这些顶层文件，其余全部删除
+          KEEP_TOP_FILES = {
+              # 核心引擎
+              'msedge.dll', 'msedgewebview2.exe', 'msedge_elf.dll',
+              'msedge_proxy.exe', 'msedge_wer.dll', 'webview2_integration.dll',
+              # 核心资源
+              'resources.pak', 'msedge_100_percent.pak', 'msedge_200_percent.pak',
+              'icudtl.dat', 'v8_context_snapshot.bin',
+              # 图形/视频（B站需要）
+              'dxcompiler.dll', 'dxil.dll', 'vulkan-1.dll', 'ffmpeg.dll',
+              # VC++ 运行库
+              'msvcp140.dll', 'msvcp140_codecvt_ids.dll', 'vcruntime140.dll',
+              'vcruntime140_1.dll', 'vccorlib140.dll', 'concrt140.dll',
+              # 输入法
+              'textInputMethod.sccd',
+          }
+
+          # 保留的目录（整个目录不动）
+          KEEP_DIRS = {'EBWebView'}
+
+          # 保留的 Locales
+          KEEP_LOCALES = {'en-US.pak', 'zh-CN.pak', 'zh-TW.pak'}
+
           try:
               # 用 winget 安装 WebView2 运行时
               print("安装 WebView2 运行时...")
               subprocess.run(["winget", "install", "Microsoft.EdgeWebView2Runtime",
                   "--accept-source-agreements", "--accept-package-agreements", "--silent"],
                   check=True, timeout=300)
-              # 找到安装目录（过滤掉非版本号目录）
+              # 找到安装目录
               for d in ["C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
                          "C:\\Program Files\\Microsoft\\EdgeWebView\\Application"]:
                   if os.path.exists(d):
-                      import re
                       vers = [v for v in os.listdir(d) if os.path.isdir(os.path.join(d, v)) and re.match(r'^\d+\.\d+\.\d+\.\d+$', v)]
                       if vers:
                           vers.sort(reverse=True)
@@ -67,40 +91,57 @@ jobs:
                           break
               else:
                   print("找不到 WebView2 安装目录"); exit(1)
-              print(f"  运行时: {rt_dir}")
-              # 复制运行时，精简不必要的文件
+
+              print(f"  运行时目录: {rt_dir}")
+
               for app in apps:
-                  name = app['name']; dst = f"apps/{name}/webview2-runtime"
+                  name = app['name']
+                  dst = f"apps/{name}/webview2-runtime"
                   shutil.rmtree(dst, ignore_errors=True)
-                  # 复制整个版本目录
-                  shutil.copytree(rt_dir, dst)
-                  # 删除不必要的目录和文件
-                  for item in os.listdir(dst):
-                      item_path = os.path.join(dst, item)
-                      # 删除 DRM 模块
-                      if item == "WidevineCdm" and os.path.isdir(item_path):
-                          shutil.rmtree(item_path)
-                      # 删除 pdb 调试符号
-                      elif item.endswith(".pdb"):
-                          os.remove(item_path)
-                      # 精简 locales（只保留中文和英文）
-                      elif item == "locales" and os.path.isdir(item_path):
-                          for loc in os.listdir(item_path):
-                              if loc not in ("en-US.pak", "zh-CN.pak", "zh-TW.pak"):
-                                  os.remove(os.path.join(item_path, loc))
-                  # 删除顶层不需要的文件
-                  for skip in ("swiftshader", "vk_swiftshader.dll", "xinput1_3.dll",
-                               "d3dcompiler_47.dll", "subresource_filter_ruleset.pak"):
-                      skip_path = os.path.join(dst, skip)
-                      if os.path.isdir(skip_path):
-                          shutil.rmtree(skip_path)
-                      elif os.path.exists(skip_path):
-                          os.remove(skip_path)
+                  os.makedirs(dst, exist_ok=True)
+
+                  # 遍历运行时目录，按白名单复制
+                  for item in os.listdir(rt_dir):
+                      src = os.path.join(rt_dir, item)
+                      dst_item = os.path.join(dst, item)
+
+                      # 目录处理
+                      if os.path.isdir(src):
+                          if item in KEEP_DIRS:
+                              # 保留整个目录
+                              shutil.copytree(src, dst_item)
+                              total = sum(os.path.getsize(os.path.join(dp,f)) for dp,_,fs in os.walk(dst_item) for f in fs)
+                              print(f"  ✓ 保留目录 {item} ({total/1024/1024:.1f} MB)")
+                          elif item == 'Locales':
+                              # 只保留中英文
+                              os.makedirs(dst_item, exist_ok=True)
+                              for loc in os.listdir(src):
+                                  if loc in KEEP_LOCALES:
+                                      shutil.copy2(os.path.join(src, loc), os.path.join(dst_item, loc))
+                              total = sum(os.path.getsize(os.path.join(dp,f)) for dp,_,fs in os.walk(dst_item) for f in fs)
+                              print(f"  ✓ 保留 Locales (精简后 {total/1024/1024:.1f} MB)")
+                          else:
+                              sz = sum(os.path.getsize(os.path.join(dp,f)) for dp,_,fs in os.walk(src) for f in fs)
+                              print(f"  ✗ 删除目录 {item} ({sz/1024/1024:.1f} MB)")
+
+                      # 文件处理
+                      elif os.path.isfile(src):
+                          if item in KEEP_TOP_FILES:
+                              shutil.copy2(src, dst_item)
+                              print(f"  ✓ 保留 {item} ({os.path.getsize(src)/1024/1024:.1f} MB)")
+                          else:
+                              sz = os.path.getsize(src)
+                              if sz > 1024*1024:
+                                  print(f"  ✗ 删除 {item} ({sz/1024/1024:.1f} MB)")
+                              # 小文件不打印
+
+                  # 统计最终大小
                   total = sum(os.path.getsize(os.path.join(dp,f)) for dp,_,fs in os.walk(dst) for f in fs)
-                  print(f"  {name}: 已就绪 ({total/1024/1024:.1f} MB)")
+                  print(f"  → {name}: 运行时精简后 {total/1024/1024:.1f} MB")
+
           except Exception as e:
               print(f"失败: {e}"); exit(1)
-          EOF
+          PYEOF
 
       - name: 构建所有客户端
         shell: bash
@@ -154,16 +195,17 @@ jobs:
           import json, os, glob, subprocess, urllib.parse
           API = "https://api.github.com/repos/yuehex15/lightweight-clients"
           UPLOAD = "https://uploads.github.com/repos/yuehex15/lightweight-clients"
+          GH_TOKEN = os.environ['GH_TOKEN']
+          headers = ["-H", f"Authorization: token {GH_TOKEN}"]
           # 创建或获取 release (统一 tag: latest)
-          r = subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+          r = subprocess.run(["curl", "-s", "-X", "POST", *headers,
               "-H", "Content-Type: application/json", f"{API}/releases",
               "-d", json.dumps({"tag_name": "latest", "name": "lightweight-clients", "draft": False, "prerelease": False})],
               capture_output=True)
           try:
               release_id = json.loads(r.stdout)['id']
           except:
-              r = subprocess.run(["curl", "-s", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                  f"{API}/releases/tags/latest"], capture_output=True)
+              r = subprocess.run(["curl", "-s", *headers, f"{API}/releases/tags/latest"], capture_output=True)
               try:
                   release_id = json.loads(r.stdout)['id']
               except:
@@ -172,14 +214,11 @@ jobs:
           for f in glob.glob("release/*.zip"):
               fname = os.path.basename(f)
               # 先删除同名旧资产
-              import json as j
-              asset_list = subprocess.run(["curl", "-s", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                  f"{API}/releases/{release_id}/assets"], capture_output=True)
-              for asset in j.loads(asset_list.stdout):
+              asset_list = subprocess.run(["curl", "-s", *headers, f"{API}/releases/{release_id}/assets"], capture_output=True)
+              for asset in json.loads(asset_list.stdout):
                   if asset['name'] == fname:
-                      subprocess.run(["curl", "-s", "-X", "DELETE", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
-                          f"{API}/releases/assets/{asset['id']}"])
-              subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+                      subprocess.run(["curl", "-s", "-X", "DELETE", *headers, f"{API}/releases/assets/{asset['id']}"])
+              subprocess.run(["curl", "-s", "-X", "POST", *headers,
                   "-H", "Content-Type: application/octet-stream", "--data-binary", f"@{f}",
                   f"{UPLOAD}/releases/{release_id}/assets?name={urllib.parse.quote(fname)}"])
               print(f"  {fname}: ✅")
