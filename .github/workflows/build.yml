@@ -54,25 +54,15 @@ jobs:
           try:
               print("下载 WebView2 安装器...")
               urllib.request.urlretrieve(url, installer)
-              print("安装 WebView2...")
-              subprocess.run([installer, "/install", "/quiet", "/norestart"], check=True, timeout=600)
-              rt_dir = None
-              for d in ["C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
-                         "C:\\Program Files\\Microsoft\\EdgeWebView\\Application"]:
-                  if os.path.exists(d):
-                      vers = [v for v in os.listdir(d) if os.path.isdir(os.path.join(d, v))]
-                      if vers:
-                          vers.sort(reverse=True)
-                          rt_dir = os.path.join(d, vers[0])
-                          break
-              if not rt_dir:
-                  print("找不到 WebView2 安装目录"); exit(1)
-              print(f"  运行时: {rt_dir}")
+              # 用 7-Zip 解压安装器提取运行时文件
+              apps = json.load(open('apps.json', encoding='utf-8'))
               for app in apps:
                   name = app['name']
                   dst = f"apps/{name}/webview2-runtime"
-                  shutil.rmtree(dst, ignore_errors=True)
-                  shutil.copytree(rt_dir, dst)
+                  os.makedirs(dst, exist_ok=True)
+                  # 解压所有文件到运行时目录
+                  subprocess.run(["7z", "x", installer, f"-o{dst}", "-y", "-r"],
+                      check=True, capture_output=True, timeout=120)
                   print(f"  {name}: 已就绪")
           except Exception as e:
               print(f"失败: {e}"); exit(1)
