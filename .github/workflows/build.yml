@@ -49,41 +49,33 @@ jobs:
           python3 - <<'EOF'
           import json, os, shutil, subprocess, urllib.request
           url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
-          pkg_path = os.path.join(os.environ.get('TEMP', 'C:\\Windows\\Temp'), "wv2_installer.exe")
+          apps = json.load(open('apps.json', encoding='utf-8'))
+          installer = os.path.join(os.environ.get('TEMP', 'C:\\Windows\\Temp'), "wv2_installer.exe")
           try:
               print("下载 WebView2 安装器...")
-              urllib.request.urlretrieve(url, pkg_path)
-              # 静默安装 WebView2
-              print("安装 WebView2（获取运行时文件）...")
-              subprocess.run([pkg_path, "/install", "/quiet", "/norestart"], check=True, timeout=300)
-              # 查找安装后的运行时目录
-              prog_dirs = [
-                  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
-                  "C:\\Program Files\\Microsoft\\EdgeWebView\\Application",
-              ]
-              runtime_src = None
-              for d in prog_dirs:
+              urllib.request.urlretrieve(url, installer)
+              print("安装 WebView2...")
+              subprocess.run([installer, "/install", "/quiet", "/norestart"], check=True, timeout=300)
+              rt_dir = None
+              for d in ["C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
+                         "C:\\Program Files\\Microsoft\\EdgeWebView\\Application"]:
                   if os.path.exists(d):
-                      versions = [v for v in os.listdir(d) if os.path.isdir(os.path.join(d, v))]
-                      if versions:
-                          versions.sort(reverse=True)
-                          runtime_src = os.path.join(d, versions[0])
+                      vers = [v for v in os.listdir(d) if os.path.isdir(os.path.join(d, v))]
+                      if vers:
+                          vers.sort(reverse=True)
+                          rt_dir = os.path.join(d, vers[0])
                           break
-              if not runtime_src:
-                  print("找不到 WebView2 安装目录")
-                  exit(1)
-              print(f"  运行时目录: {runtime_src}")
-              # 复制到各 app 目录
-              apps = json.load(open('apps.json', encoding='utf-8'))
+              if not rt_dir:
+                  print("找不到 WebView2 安装目录"); exit(1)
+              print(f"  运行时: {rt_dir}")
               for app in apps:
                   name = app['name']
                   dst = f"apps/{name}/webview2-runtime"
                   shutil.rmtree(dst, ignore_errors=True)
-                  shutil.copytree(runtime_src, dst)
-                  print(f"  {name}: 运行时已就绪")
+                  shutil.copytree(rt_dir, dst)
+                  print(f"  {name}: 已就绪")
           except Exception as e:
-              print(f"失败: {e}")
-              exit(1)
+              print(f"失败: {e}"); exit(1)
           EOF
 
       - name: 构建所有客户端
@@ -99,8 +91,7 @@ jobs:
               subprocess.run("npx @tauri-apps/cli icon src-tauri/icons/icon.png", shell=True, check=False)
               r = subprocess.run("cargo tauri build", shell=True)
               if r.returncode != 0:
-                  print(f"❌ {name} 构建失败")
-                  exit(1)
+                  print(f"❌ {name} 构建失败"); exit(1)
               os.chdir("../..")
           print("✅ 全部构建完成")
           EOF
@@ -113,17 +104,15 @@ jobs:
           apps = json.load(open('apps.json', encoding='utf-8'))
           os.makedirs('release', exist_ok=True)
           for app in apps:
-              name = app['name']
-              title = app['title']
+              name = app['name']; title = app['title']
               pkg_dir = f"release/{title}"
               os.makedirs(pkg_dir, exist_ok=True)
               for exe in glob.glob(f"apps/{name}/src-tauri/target/release/*.exe"):
                   shutil.copy(exe, pkg_dir)
               shutil.copy(f"apps/{name}/settings.ini", pkg_dir)
-              # 包含 WebView2 运行时（便携）
-              runtime_src = f"apps/{name}/webview2-runtime"
-              if os.path.exists(runtime_src):
-                  shutil.copytree(runtime_src, f"{pkg_dir}/webview2-runtime", dirs_exist_ok=True)
+              rt = f"apps/{name}/webview2-runtime"
+              if os.path.exists(rt):
+                  shutil.copytree(rt, f"{pkg_dir}/webview2-runtime", dirs_exist_ok=True)
               os.makedirs('release/msi', exist_ok=True)
               for msi in glob.glob(f"apps/{name}/src-tauri/target/release/bundle/msi/*.msi"):
                   shutil.copy(msi, 'release/msi')
@@ -143,11 +132,9 @@ jobs:
           UPLOAD = "https://uploads.github.com/repos/yuehex15/lightweight-clients"
           apps = json.load(open('apps.json', encoding='utf-8'))
           for app in apps:
-              name = app['name']
-              title = app['title']
+              name = app['name']; title = app['title']
               zip_path = glob.glob(f"release/{title}-Windows-x64.zip")[0]
               msi_paths = glob.glob(f"release/msi/{title}*.msi")
-              # 创建或获取 release
               r = subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
                   "-H", "Content-Type: application/json", f"{API}/releases",
                   "-d", json.dumps({"tag_name": name, "name": title, "draft": False, "prerelease": False})],
@@ -161,12 +148,10 @@ jobs:
                       release_id = json.loads(r.stdout)['id']
                   except:
                       print(f"❌ {name}: 无法获取 release"); continue
-              # 上传 zip
               subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
                   "-H", "Content-Type: application/zip", "--data-binary", f"@{zip_path}",
                   f"{UPLOAD}/releases/{release_id}/assets?name={urllib.parse.quote(os.path.basename(zip_path))}"])
               print(f"  {title}: zip ✅")
-              # 上传 MSI
               for msi in msi_paths:
                   subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
                       "-H", "Content-Type: application/octet-stream", "--data-binary", f"@{msi}",
