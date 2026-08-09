@@ -12,7 +12,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(ROOT, "template")
 APPS_JSON = os.path.join(ROOT, "apps.json")
 OUT = os.path.join(ROOT, "apps")
-DEFAULT_ICON = os.path.join(TEMPLATE, "default_icon.png")
+DEFAULT_ICON = os.path.join(TEMPLATE, "icons", "icon.png")
 
 
 def download_icon(url, dest):
@@ -86,18 +86,22 @@ def generate_app(app):
     os.makedirs(os.path.join(src_tauri, "icons"), exist_ok=True)
     os.makedirs(os.path.join(out_dir, "dist"), exist_ok=True)
 
-    # 生成图标源文件
-    icon_path = os.path.join(src_tauri, "icons", "icon.png")
+    # 复制所有图标文件
+    icons_template = os.path.join(TEMPLATE, "icons")
+    icons_dest = os.path.join(src_tauri, "icons")
+    if os.path.exists(icons_template):
+        for f in os.listdir(icons_template):
+            shutil.copy2(os.path.join(icons_template, f), os.path.join(icons_dest, f))
+    # 如果设置了 icon_url，下载并覆盖源图
     icon_url = app.get("icon_url")
     if icon_url:
+        icon_path = os.path.join(icons_dest, "icon.png")
         print(f"  🔽 下载图标: {icon_url}")
         if download_icon(icon_url, icon_path):
             print(f"  ✓ 图标已下载")
         else:
-            shutil.copy(DEFAULT_ICON, icon_path)
             print(f"  ✓ 使用默认图标（下载失败）")
     else:
-        shutil.copy(DEFAULT_ICON, icon_path)
         print(f"  ✓ 使用默认图标")
 
     # 生成源码文件
