@@ -48,7 +48,7 @@ jobs:
         run: |
           python3 - <<'EOF'
           import json, os, shutil, subprocess, urllib.request
-          url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+          url = "https://go.microsoft.com/fwlink/?linkid=2124701"
           apps = json.load(open('apps.json', encoding='utf-8'))
           installer = os.path.join(os.environ.get('TEMP', 'C:\\Windows\\Temp'), "wv2_installer.exe")
           try:

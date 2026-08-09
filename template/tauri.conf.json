@@ -1,15 +1,15 @@
 {
-  "productName": "{{TITLE}}",
+  "productName": "x",
   "version": "0.1.0",
-  "identifier": "{{IDENTIFIER}}",
-  "mainBinaryName": "{{TITLE}}",
+  "identifier": "x",
+  "mainBinaryName": "x",
   "build": {
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "title": "{{TITLE}}",
+        "title": "x",
         "url": "about:blank",
         "width": 1280,
         "height": 720,
@@ -43,8 +43,7 @@
         "installMode": "currentUser"
       },
       "webviewInstallMode": {
-        "type": "offlineInstaller",
-        "silent": true
+        "type": "skip"
       }
     }
   }
