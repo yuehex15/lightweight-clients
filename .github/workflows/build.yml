@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           python3 - <<'EOF'
-          import json, subprocess, os, glob
+          import json, subprocess, os
           apps = json.load(open('apps.json', encoding='utf-8'))
           for app in apps:
               name = app['name']
@@ -74,91 +74,56 @@ jobs:
               title = app['title']
               pkg_dir = f"release/{title}"
               os.makedirs(pkg_dir, exist_ok=True)
-              # exe
               for exe in glob.glob(f"apps/{name}/src-tauri/target/release/*.exe"):
                   shutil.copy(exe, pkg_dir)
-              # settings.ini
               shutil.copy(f"apps/{name}/settings.ini", pkg_dir)
-              # MSI
               os.makedirs('release/msi', exist_ok=True)
               for msi in glob.glob(f"apps/{name}/src-tauri/target/release/bundle/msi/*.msi"):
                   shutil.copy(msi, 'release/msi')
-              # zip
               shutil.make_archive(f"release/{title}-Windows-x64", 'zip', pkg_dir)
               print(f"打包 {title} 完成")
           print("✅ 打包完成")
           EOF
 
-      - name: 发布到 Release（覆盖旧版本）
+      - name: 发布到 Release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python3 - <<'EOF'
-          import json, os, glob, urllib.request, urllib.parse
-
-          GH_TOKEN = os.environ['GH_TOKEN']
-          REPO = "yuehex15/lightweight-clients"
-          API = f"https://api.github.com/repos/{REPO}"
-          UPLOAD = f"https://uploads.github.com/repos/{REPO}"
-
-          def req(url, method="GET", data=None, headers=None, raw=False):
-              h = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-              if headers: h.update(headers)
-              body = None
-              if data is not None:
-                  if raw:
-                      body = data
-                  else:
-                      body = json.dumps(data).encode('utf-8')
-                      h["Content-Type"] = "application/json"
-              r = urllib.request.Request(url, data=body, method=method, headers=h)
-              try:
-                  with urllib.request.urlopen(r) as resp:
-                      return resp.status, resp.read()
-              except urllib.error.HTTPError as e:
-                  return e.code, e.read()
-
+          import json, os, glob, subprocess, urllib.parse
+          API = "https://api.github.com/repos/yuehex15/lightweight-clients"
+          UPLOAD = "https://uploads.github.com/repos/yuehex15/lightweight-clients"
           apps = json.load(open('apps.json', encoding='utf-8'))
           for app in apps:
               name = app['name']
               title = app['title']
               zip_path = glob.glob(f"release/{title}-Windows-x64.zip")[0]
               msi_paths = glob.glob(f"release/msi/{title}*.msi")
-
-              # 创建 release（若 tag 已存在会 422，则获取现有）
-              status, body = req(f"{API}/releases", "POST", {
-                  "tag_name": name, "name": title,
-                  "body": f"{title} 轻量 Windows 客户端 — 由 GitHub Actions 自动构建",
-                  "draft": False, "prerelease": False
-              })
-              release_id = None
-              if status == 201:
-                  release_id = json.loads(body)['id']
-              else:
-                  status, body = req(f"{API}/releases/tags/{name}")
-                  if status == 200:
-                      release_id = json.loads(body)['id']
-
-              if not release_id:
-                  print(f"❌ {name}: 无法创建/获取 release (HTTP {status})")
-                  continue
-
+              # 创建或获取 release
+              r = subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+                  "-H", "Content-Type: application/json", f"{API}/releases",
+                  "-d", json.dumps({"tag_name": name, "name": title, "draft": False, "prerelease": False})],
+                  capture_output=True)
+              try:
+                  release_id = json.loads(r.stdout)['id']
+              except:
+                  r = subprocess.run(["curl", "-s", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+                      f"{API}/releases/tags/{name}"], capture_output=True)
+                  try:
+                      release_id = json.loads(r.stdout)['id']
+                  except:
+                      print(f"❌ {name}: 无法获取 release"); continue
               # 上传 zip
-              with open(zip_path, 'rb') as f:
-                  data = f.read()
-              fname = urllib.parse.quote(zip_path.split('/')[-1])
-              status, body = req(f"{UPLOAD}/releases/{release_id}/assets?name={fname}",
-                                 "POST", data, {"Content-Type": "application/zip"}, raw=True)
-              print(f"  {title}: zip {'✅' if status in (200,201) else '❌ HTTP '+str(status)}")
-
+              subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+                  "-H", "Content-Type: application/zip", "--data-binary", f"@{zip_path}",
+                  f"{UPLOAD}/releases/{release_id}/assets?name={urllib.parse.quote(os.path.basename(zip_path))}"])
+              print(f"  {title}: zip ✅")
               # 上传 MSI
               for msi in msi_paths:
-                  with open(msi, 'rb') as f:
-                      data = f.read()
-                  fname = urllib.parse.quote(msi.split('/')[-1])
-                  status, body = req(f"{UPLOAD}/releases/{release_id}/assets?name={fname}",
-                                     "POST", data, {"Content-Type": "application/octet-stream"}, raw=True)
-                  print(f"  {title}: MSI {'✅' if status in (200,201) else '❌ HTTP '+str(status)}")
+                  subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+                      "-H", "Content-Type: application/octet-stream", "--data-binary", f"@{msi}",
+                      f"{UPLOAD}/releases/{release_id}/assets?name={urllib.parse.quote(os.path.basename(msi))}"])
+                  print(f"  {title}: MSI ✅")
           print("✅ 发布完成")
           EOF
