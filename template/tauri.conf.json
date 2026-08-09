@@ -43,7 +43,7 @@
         "installMode": "currentUser"
       },
       "webview2": {
-        "installMode": "downloadBootstrapper",
+        "installMode": "offlineInstaller",
         "downloadUrl": "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
         "fixWebView2Options": {
           "silent": true
