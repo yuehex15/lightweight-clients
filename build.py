@@ -6,50 +6,23 @@
 import json
 import os
 import shutil
-import struct
-import zlib
+import urllib.request
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(ROOT, "template")
 APPS_JSON = os.path.join(ROOT, "apps.json")
 OUT = os.path.join(ROOT, "apps")
+DEFAULT_ICON = os.path.join(TEMPLATE, "default_icon.png")
 
 
-def create_png(width, height, pixels):
-    def wc(t, d):
-        c = t + d
-        return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
-    raw = b''
-    for y in range(height):
-        raw += b'\x00'
-        for x in range(width):
-            raw += struct.pack('BBBB', *pixels[y * width + x])
-    return (b'\x89PNG\r\n\x1a\n'
-            + wc(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0))
-            + wc(b'IDAT', zlib.compress(raw)) + wc(b'IEND', b''))
-
-
-def make_icon(size, color):
-    """生成圆角矩形渐变图标"""
-    r0, g0, b0 = color
-    cr = int(size * 0.18)
-    cx, cy = size // 2, size // 2
-    pixels = []
-    for y in range(size):
-        for x in range(size):
-            def in_rr(px, py, s, r):
-                if px < r and py < r: return (px-r)**2 + (py-r)**2 <= r**2
-                if px >= s-r and py < r: return (px-(s-r))**2 + (py-r)**2 <= r**2
-                if px < r and py >= s-r: return (px-r)**2 + (py-(s-r))**2 <= r**2
-                if px >= s-r and py >= s-r: return (px-(s-r))**2 + (py-(s-r))**2 <= r**2
-                return True
-            if in_rr(x, y, size, cr):
-                d = ((x-cx)**2 + (y-cy)**2)**0.5
-                f = 1.0 - (d / cx) * 0.15
-                pixels.append((min(255,int(r0*f)), min(255,int(g0*f)), min(255,int(b0*f)), 255))
-            else:
-                pixels.append((0,0,0,0))
-    return create_png(size, size, pixels)
+def download_icon(url, dest):
+    """下载图标到目标路径"""
+    try:
+        urllib.request.urlretrieve(url, dest)
+        return True
+    except Exception as e:
+        print(f"  ⚠ 下载图标失败: {e}")
+        return False
 
 
 def gen_settings_ini(app):
@@ -114,10 +87,18 @@ def generate_app(app):
     os.makedirs(os.path.join(out_dir, "dist"), exist_ok=True)
 
     # 生成图标源文件
-    icon_png = make_icon(256, app["icon_color"])
-    with open(os.path.join(src_tauri, "icons", "icon.png"), "wb") as f:
-        f.write(icon_png)
-    print(f"  ✓ 生成图标 icon.png")
+    icon_path = os.path.join(src_tauri, "icons", "icon.png")
+    icon_url = app.get("icon_url")
+    if icon_url:
+        print(f"  🔽 下载图标: {icon_url}")
+        if download_icon(icon_url, icon_path):
+            print(f"  ✓ 图标已下载")
+        else:
+            shutil.copy(DEFAULT_ICON, icon_path)
+            print(f"  ✓ 使用默认图标（下载失败）")
+    else:
+        shutil.copy(DEFAULT_ICON, icon_path)
+        print(f"  ✓ 使用默认图标")
 
     # 生成源码文件
     subs = {
