@@ -60,6 +60,11 @@ fn apply_config() -> HashMap<String, String> {
         browser_args.push_str("--disable-gpu");
     }
 
+    if config.get("single_process").map(|s| s == "true").unwrap_or(false) {
+        if !browser_args.is_empty() { browser_args.push(' '); }
+        browser_args.push_str("--single-process --no-sandbox");
+    }
+
     if let Some(heap) = config.get("max_js_heap") {
         if !browser_args.is_empty() { browser_args.push(' '); }
         browser_args.push_str(&format!("--js-flags=--max-old-space-size={}", heap));

@@ -41,6 +41,9 @@ proxy_mode = system
 # 禁用 GPU 加速（省内存，默认开启）
 disable_gpu = true
 
+# 单进程模式（省内存/CPU，减少进程数，默认开启）
+single_process = true
+
 # JS 堆内存上限（MB，默认 128）
 max_js_heap = 128
 """
