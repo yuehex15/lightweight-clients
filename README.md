@@ -24,9 +24,12 @@
   "width": 1280,              // 窗口宽度
   "height": 720,              // 窗口高度
   "identifier": "com.myapp.client",  // 应用标识
-  "icon_color": [100, 200, 50]       // 图标颜色 RGB
+  "icon_url": "https://example.com/icon.png"  // 可选：自定义图标 URL
 }
 ```
+
+- 不设置 `icon_url` → 使用默认紫色图标
+- 设置 `icon_url` → 自动下载该图片作为应用图标
 
 修改后推送，CI 会自动：
 1. 生成客户端源码
