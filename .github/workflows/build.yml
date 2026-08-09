@@ -50,18 +50,30 @@ jobs:
           import json, os, shutil, subprocess, urllib.request
           url = "https://go.microsoft.com/fwlink/?linkid=2124701"
           apps = json.load(open('apps.json', encoding='utf-8'))
-          installer = os.path.join(os.environ.get('TEMP', 'C:\\Windows\\Temp'), "wv2_installer.exe")
+          tmp = os.path.join(os.environ.get('TEMP', 'C:\\Windows\\Temp'), "wv2")
           try:
-              print("下载 WebView2 安装器...")
-              urllib.request.urlretrieve(url, installer)
-              # 用 7-Zip 解压安装器提取运行时文件
-              apps = json.load(open('apps.json', encoding='utf-8'))
+              print("下载 WebView2 离线安装器...")
+              exe = os.path.join(tmp, "installer.exe")
+              os.makedirs(tmp, exist_ok=True)
+              urllib.request.urlretrieve(url, exe)
+              # 第一层解压：安装器 → MSI + CAB
+              ext1 = os.path.join(tmp, "extracted")
+              subprocess.run(["7z", "x", exe, f"-o{ext1}", "-y", "-r"], check=True, capture_output=True, timeout=120)
+              # 找到 MSI 文件
+              msi_files = []
+              for root, dirs, files in os.walk(ext1):
+                  for f in files:
+                      if f.endswith('.msi'):
+                          msi_files.append(os.path.join(root, f))
+              if not msi_files:
+                  print("找不到 MSI 文件"); exit(1)
+              print(f"  MSI: {os.path.basename(msi_files[0])}")
+              # 第二层解压：MSI → 运行时文件
               for app in apps:
                   name = app['name']
                   dst = f"apps/{name}/webview2-runtime"
                   os.makedirs(dst, exist_ok=True)
-                  # 解压所有文件到运行时目录
-                  subprocess.run(["7z", "x", installer, f"-o{dst}", "-y", "-r"],
+                  subprocess.run(["7z", "x", msi_files[0], f"-o{dst}", "-y", "-r"],
                       check=True, capture_output=True, timeout=120)
                   print(f"  {name}: 已就绪")
           except Exception as e:
