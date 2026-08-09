@@ -164,8 +164,8 @@ jobs:
                   release_id = json.loads(r.stdout)['id']
               except:
                   print("❌ 无法获取 release"); exit(1)
-          # 上传所有文件
-          for f in glob.glob("release/*.zip") + glob.glob("release/msi/*.msi"):
+          # 上传所有 zip 文件（不包含 MSI）
+          for f in glob.glob("release/*.zip"):
               fname = os.path.basename(f)
               subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
                   "-H", "Content-Type: application/octet-stream", "--data-binary", f"@{f}",
