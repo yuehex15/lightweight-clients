@@ -1,15 +1,15 @@
 {
-  "productName": "x",
+  "productName": "{{TITLE}}",
   "version": "0.1.0",
-  "identifier": "x",
-  "mainBinaryName": "x",
+  "identifier": "{{IDENTIFIER}}",
+  "mainBinaryName": "{{TITLE}}",
   "build": {
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "title": "x",
+        "title": "{{TITLE}}",
         "url": "about:blank",
         "width": 1280,
         "height": 720,
