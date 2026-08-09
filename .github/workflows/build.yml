@@ -55,11 +55,12 @@ jobs:
               subprocess.run(["winget", "install", "Microsoft.EdgeWebView2Runtime",
                   "--accept-source-agreements", "--accept-package-agreements", "--silent"],
                   check=True, timeout=300)
-              # 找到安装目录
+              # 找到安装目录（过滤掉非版本号目录）
               for d in ["C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
                          "C:\\Program Files\\Microsoft\\EdgeWebView\\Application"]:
                   if os.path.exists(d):
-                      vers = [v for v in os.listdir(d) if os.path.isdir(os.path.join(d, v))]
+                      import re
+                      vers = [v for v in os.listdir(d) if os.path.isdir(os.path.join(d, v)) and re.match(r'^\d+\.\d+\.\d+\.\d+$', v)]
                       if vers:
                           vers.sort(reverse=True)
                           rt_dir = os.path.join(d, vers[0])
