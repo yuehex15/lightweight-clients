@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           python3 - <<'EOF'
-          import json, os, shutil, subprocess, urllib.request, glob
+          import json, os, shutil, subprocess, urllib.request
           url = "https://go.microsoft.com/fwlink/?linkid=2124701"
           apps = json.load(open('apps.json', encoding='utf-8'))
           tmp = os.path.join(os.environ.get('TEMP', 'C:\\Windows\\Temp'), "wv2")
@@ -57,30 +57,20 @@ jobs:
               exe = os.path.join(tmp, "installer.exe")
               urllib.request.urlretrieve(url, exe)
               print(f"  下载: {os.path.getsize(exe)/1024/1024:.1f} MB")
-              ext1 = os.path.join(tmp, "extracted")
-              subprocess.run(["7z", "x", exe, f"-o{ext1}", "-y", "-r"], check=True, capture_output=True, timeout=120)
-              msi_files = glob.glob(ext1 + "/**/*.msi", recursive=True)
-              if not msi_files:
-                  print("无 MSI，直接使用提取的文件")
-                  for app in apps:
-                      dst = f"apps/{app['name']}/webview2-runtime"
-                      shutil.rmtree(dst, ignore_errors=True)
-                      shutil.copytree(ext1, dst)
-                      print(f"  {app['name']}: 已就绪")
-                  exit(0)
-              msi = msi_files[0]
-              print(f"  MSI: {os.path.basename(msi)}")
-              msi_ext = os.path.join(tmp, "msi_extracted")
-              os.makedirs(msi_ext, exist_ok=True)
-              subprocess.run(["msiexec", "/a", msi, "/quiet", f"TARGETDIR={msi_ext}"], check=True, timeout=300)
-              print(f"  msiexec /a 完成")
-              rt_dir = None
-              for root, dirs, files in os.walk(msi_ext):
-                  for f in files:
-                      if f == "msedgewebview2.exe":
-                          rt_dir = root; break
-                  if rt_dir: break
-              if not rt_dir: rt_dir = msi_ext
+              # 静默安装（离线安装器，不联网，应该很快）
+              print("安装 WebView2（提取运行时文件）...")
+              subprocess.run([exe, "/install", "/quiet", "/norestart"], check=True, timeout=600)
+              # 找到安装后的运行时目录
+              for d in ["C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
+                         "C:\\Program Files\\Microsoft\\EdgeWebView\\Application"]:
+                  if os.path.exists(d):
+                      vers = [v for v in os.listdir(d) if os.path.isdir(os.path.join(d, v))]
+                      if vers:
+                          vers.sort(reverse=True)
+                          rt_dir = os.path.join(d, vers[0])
+                          break
+              else:
+                  print("找不到 WebView2 安装目录"); exit(1)
               print(f"  运行时: {rt_dir}")
               for app in apps:
                   name = app['name']; dst = f"apps/{name}/webview2-runtime"
@@ -158,9 +148,17 @@ jobs:
                   release_id = json.loads(r.stdout)['id']
               except:
                   print("❌ 无法获取 release"); exit(1)
-          # 上传所有 zip 文件（不包含 MSI）
+          # 上传所有 zip 文件（先删同名旧资产）
           for f in glob.glob("release/*.zip"):
               fname = os.path.basename(f)
+              # 先删除同名旧资产
+              import json as j
+              asset_list = subprocess.run(["curl", "-s", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+                  f"{API}/releases/{release_id}/assets"], capture_output=True)
+              for asset in j.loads(asset_list.stdout):
+                  if asset['name'] == fname:
+                      subprocess.run(["curl", "-s", "-X", "DELETE", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
+                          f"{API}/releases/assets/{asset['id']}"])
               subprocess.run(["curl", "-s", "-X", "POST", "-H", f"Authorization: token {os.environ['GH_TOKEN']}",
                   "-H", "Content-Type: application/octet-stream", "--data-binary", f"@{f}",
                   f"{UPLOAD}/releases/{release_id}/assets?name={urllib.parse.quote(fname)}"])
