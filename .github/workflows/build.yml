@@ -55,7 +55,7 @@ jobs:
               print("下载 WebView2 安装器...")
               urllib.request.urlretrieve(url, installer)
               print("安装 WebView2...")
-              subprocess.run([installer, "/install", "/quiet", "/norestart"], check=True, timeout=300)
+              subprocess.run([installer, "/install", "/quiet", "/norestart"], check=True, timeout=600)
               rt_dir = None
               for d in ["C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
                          "C:\\Program Files\\Microsoft\\EdgeWebView\\Application"]:
