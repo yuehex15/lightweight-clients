@@ -43,6 +43,49 @@ jobs:
       - name: 生成所有客户端源码
         run: python3 build.py
 
+      - name: 下载 WebView2 运行时（便携）
+        shell: bash
+        run: |
+          python3 - <<'EOF'
+          import json, os, shutil, subprocess, urllib.request
+          url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
+          pkg_path = "/tmp/wv2_installer.exe"
+          try:
+              print("下载 WebView2 安装器...")
+              urllib.request.urlretrieve(url, pkg_path)
+              # 静默安装 WebView2
+              print("安装 WebView2（获取运行时文件）...")
+              subprocess.run([pkg_path, "/install", "/quiet", "/norestart"], check=True, timeout=300)
+              # 查找安装后的运行时目录
+              prog_dirs = [
+                  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
+                  "C:\\Program Files\\Microsoft\\EdgeWebView\\Application",
+              ]
+              runtime_src = None
+              for d in prog_dirs:
+                  if os.path.exists(d):
+                      versions = [v for v in os.listdir(d) if os.path.isdir(os.path.join(d, v))]
+                      if versions:
+                          versions.sort(reverse=True)
+                          runtime_src = os.path.join(d, versions[0])
+                          break
+              if not runtime_src:
+                  print("找不到 WebView2 安装目录")
+                  exit(1)
+              print(f"  运行时目录: {runtime_src}")
+              # 复制到各 app 目录
+              apps = json.load(open('apps.json', encoding='utf-8'))
+              for app in apps:
+                  name = app['name']
+                  dst = f"apps/{name}/webview2-runtime"
+                  shutil.rmtree(dst, ignore_errors=True)
+                  shutil.copytree(runtime_src, dst)
+                  print(f"  {name}: 运行时已就绪")
+          except Exception as e:
+              print(f"失败: {e}")
+              exit(1)
+          EOF
+
       - name: 构建所有客户端
         shell: bash
         run: |
