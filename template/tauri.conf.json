@@ -42,12 +42,9 @@
       "nsis": {
         "installMode": "currentUser"
       },
-      "webview2": {
-        "installMode": "offlineInstaller",
-        "downloadUrl": "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
-        "fixWebView2Options": {
-          "silent": true
-        }
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
       }
     }
   }
