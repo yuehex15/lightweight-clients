@@ -47,20 +47,15 @@ jobs:
         shell: bash
         run: |
           python3 - <<'EOF'
-          import json, os, shutil, subprocess, urllib.request
-          url = "https://go.microsoft.com/fwlink/?linkid=2124701"
+          import json, os, shutil, subprocess
           apps = json.load(open('apps.json', encoding='utf-8'))
-          tmp = os.path.join(os.environ.get('TEMP', 'C:\\Windows\\Temp'), "wv2")
-          os.makedirs(tmp, exist_ok=True)
           try:
-              print("下载 WebView2 离线安装器...")
-              exe = os.path.join(tmp, "installer.exe")
-              urllib.request.urlretrieve(url, exe)
-              print(f"  下载: {os.path.getsize(exe)/1024/1024:.1f} MB")
-              # 静默安装（离线安装器，不联网，应该很快）
-              print("安装 WebView2（提取运行时文件）...")
-              subprocess.run([exe, "/install", "/quiet", "/norestart"], check=True, timeout=600)
-              # 找到安装后的运行时目录
+              # 用 winget 安装 WebView2 运行时
+              print("安装 WebView2 运行时...")
+              subprocess.run(["winget", "install", "Microsoft.EdgeWebView2Runtime",
+                  "--accept-source-agreements", "--accept-package-agreements", "--silent"],
+                  check=True, timeout=300)
+              # 找到安装目录
               for d in ["C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application",
                          "C:\\Program Files\\Microsoft\\EdgeWebView\\Application"]:
                   if os.path.exists(d):
