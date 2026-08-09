@@ -11,8 +11,8 @@
       {
         "title": "{{TITLE}}",
         "url": "about:blank",
-        "width": {{WIDTH}},
-        "height": {{HEIGHT}},
+        "width": 1280,
+        "height": 720,
         "minWidth": 800,
         "minHeight": 600,
         "resizable": true,
@@ -41,6 +41,13 @@
       },
       "nsis": {
         "installMode": "currentUser"
+      },
+      "webview2": {
+        "installMode": "downloadBootstrapper",
+        "downloadUrl": "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+        "fixWebView2Options": {
+          "silent": true
+        }
       }
     }
   }
