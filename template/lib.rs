@@ -62,7 +62,7 @@ fn apply_config() -> HashMap<String, String> {
 
     if config.get("single_process").map(|s| s == "true").unwrap_or(false) {
         if !browser_args.is_empty() { browser_args.push(' '); }
-        browser_args.push_str("--single-process --no-sandbox");
+        browser_args.push_str("--single-process --no-sandbox --disable-background-networking --no-first-run --disable-sync --disable-component-update");
     }
 
     if let Some(heap) = config.get("max_js_heap") {

@@ -68,12 +68,36 @@ jobs:
               else:
                   print("找不到 WebView2 安装目录"); exit(1)
               print(f"  运行时: {rt_dir}")
+              # 复制运行时，精简不必要的文件
               for app in apps:
                   name = app['name']; dst = f"apps/{name}/webview2-runtime"
                   shutil.rmtree(dst, ignore_errors=True)
+                  # 复制整个版本目录
                   shutil.copytree(rt_dir, dst)
-                  c = len(os.listdir(dst))
-                  print(f"  {name}: 已就绪 ({c} 个文件)")
+                  # 删除不必要的目录和文件
+                  for item in os.listdir(dst):
+                      item_path = os.path.join(dst, item)
+                      # 删除 DRM 模块
+                      if item == "WidevineCdm" and os.path.isdir(item_path):
+                          shutil.rmtree(item_path)
+                      # 删除 pdb 调试符号
+                      elif item.endswith(".pdb"):
+                          os.remove(item_path)
+                      # 精简 locales（只保留中文和英文）
+                      elif item == "locales" and os.path.isdir(item_path):
+                          for loc in os.listdir(item_path):
+                              if loc not in ("en-US.pak", "zh-CN.pak", "zh-TW.pak"):
+                                  os.remove(os.path.join(item_path, loc))
+                  # 删除顶层不需要的文件
+                  for skip in ("swiftshader", "vk_swiftshader.dll", "xinput1_3.dll",
+                               "d3dcompiler_47.dll", "subresource_filter_ruleset.pak"):
+                      skip_path = os.path.join(dst, skip)
+                      if os.path.isdir(skip_path):
+                          shutil.rmtree(skip_path)
+                      elif os.path.exists(skip_path):
+                          os.remove(skip_path)
+                  total = sum(os.path.getsize(os.path.join(dp,f)) for dp,_,fs in os.walk(dst) for f in fs)
+                  print(f"  {name}: 已就绪 ({total/1024/1024:.1f} MB)")
           except Exception as e:
               print(f"失败: {e}"); exit(1)
           EOF
